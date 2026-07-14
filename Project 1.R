@@ -1,7 +1,3 @@
-# ══════════════════════════════════════════════════════════════════════════════
-# ECON 373: Economic Forecasting
-# PRE-PROCESSING DIAGNOSTICS — Detrending & Deseasonalising CPI
-#
 # PURPOSE:
 #   Before modelling we need to verify:
 #     (1) The raw CPI level is non-stationary (trending upward)
