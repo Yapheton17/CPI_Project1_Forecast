@@ -137,4 +137,97 @@ cat("\nConclusion: CPI level is I(1). YoY % is stationary (I(0)).\n")
 cat("We model the YoY % series directly — no further differencing needed.\n")
 cat("══════════════════════════════════════════════════════════\n\n")
 
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2 — ACF / PACF: BEFORE AND AFTER DETRENDING
+# ══════════════════════════════════════════════════════════════════════════════
+# This shows the examiner exactly what the YoY transformation achieves:
+#   • Level ACF: very slow decay → classic unit-root / trending signature
+#   • YoY ACF:   faster decay + seasonal spikes at lag 12, 24 → mean-reverting
+
+par(mfrow = c(2, 2), mar = c(4, 4.5, 3.5, 1.5), bg = "white")
+
+Acf(cpi_level_ts, lag.max = 36,
+    main = "ACF — CPI Level\n(slow decay = non-stationary)")
+Pacf(cpi_level_ts, lag.max = 36,
+     main = "PACF — CPI Level\n(large lag-1 spike)")
+
+Acf(cpi_yoy_ts, lag.max = 36,
+    main = "ACF — CPI YoY %\n(faster decay, seasonal spikes at 12,24)")
+Pacf(cpi_yoy_ts, lag.max = 36,
+     main = "PACF — CPI YoY %\n(AR structure visible, not unit-root)")
+
+par(mfrow = c(1, 1))
+
+cat("══════════════════════════════════════════════════════════\n")
+cat("  SECTION 2: ACF / PACF INTERPRETATION\n")
+cat("══════════════════════════════════════════════════════════\n")
+cat("CPI Level ACF:\n")
+cat("  → Near-unit decay across 36 lags → strong evidence of non-stationarity\n")
+cat("  → PACF cuts off sharply at lag 1 → consistent with AR(1)-like unit root\n\n")
+cat("CPI YoY % ACF:\n")
+cat("  → Decay is present but manageable → mean-reverting\n")
+cat("  → Spikes at lags 12 and 24 → residual seasonality in the YoY series\n")
+cat("  → PACF: significant lags at 1, 2 → AR(1) or AR(2) may be sufficient\n")
+cat("  → This motivates STL to further remove seasonal component before modelling\n")
+cat("══════════════════════════════════════════════════════════\n\n")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 — CLASSICAL ADDITIVE DECOMPOSITION
+# ══════════════════════════════════════════════════════════════════════════════
+# Classical decomposition:  Y = Trend + Seasonal + Remainder
+# Method: centered moving average for trend, then fixed seasonal factors
+# Limitation: assumes seasonal pattern is CONSTANT over time
+#             → breaks down during COVID spike (outlier contaminates trend)
+
+cat("══════════════════════════════════════════════════════════\n")
+cat("  SECTION 3: CLASSICAL DECOMPOSITION\n")
+cat("══════════════════════════════════════════════════════════\n")
+
+classical <- decompose(cpi_yoy_ts, type = "additive")
+
+# Summarise components
+trend_cl    <- as.numeric(classical$trend)
+seasonal_cl <- as.numeric(classical$seasonal)
+remainder_cl <- as.numeric(classical$random)
+
+cat(sprintf("Trend range    : [%.3f, %.3f]\n",
+            min(trend_cl, na.rm=TRUE), max(trend_cl, na.rm=TRUE)))
+cat(sprintf("Seasonal range : [%.4f, %.4f]\n",
+            min(seasonal_cl), max(seasonal_cl)))
+cat(sprintf("Remainder SD   : %.4f\n", sd(remainder_cl, na.rm=TRUE)))
+cat(sprintf("Seasonal strength (Var_S / Var_S+R) : %.4f\n",
+            var(seasonal_cl) / (var(seasonal_cl) + var(remainder_cl, na.rm=TRUE))))
+cat(sprintf("Trend strength  (Var_T / Var_T+R)   : %.4f\n\n",
+            var(trend_cl, na.rm=TRUE) /
+              (var(trend_cl, na.rm=TRUE) + var(remainder_cl, na.rm=TRUE))))
+
+cat("Limitation: Classical assumes FIXED seasonal factors across all years.\n")
+cat("The COVID spike (2021-22) inflates the trend estimate and distorts\n")
+cat("the seasonal component. STL (Section 4) addresses this.\n")
+cat("══════════════════════════════════════════════════════════\n\n")
+
+# Plot classical decomposition
+par(mar = c(4, 4.5, 3.5, 1.5), bg = "white")
+plot(classical,
+     main = "Classical Additive Decomposition — CPI YoY %")
+
+# ── Classical seasonal factors bar chart ────────────────────────────────────
+seas_df <- data.frame(
+  month  = month.abb,
+  factor = as.numeric(classical$figure)
+)
+seas_df$month <- factor(seas_df$month, levels = month.abb)
+
+p_seas_cl <- ggplot(seas_df, aes(x = month, y = factor,
+                                 fill = factor > 0)) +
+  geom_col(colour = "white", width = 0.7) +
+  geom_hline(yintercept = 0, colour = "grey40") +
+  scale_fill_manual(values = c("TRUE" = "#E05C2A", "FALSE" = "#3A8FB5"),
+                    guide = "none") +
+  labs(title    = "Classical Decomposition — Fixed Seasonal Factors",
+       subtitle = "Positive = above average inflation month, Negative = below",
+       x = NULL, y = "Seasonal factor (pp)") +
+  theme_minimal(base_size = 12)
+print(p_seas_cl)
 
